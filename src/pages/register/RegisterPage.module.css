@@ -1,0 +1,15 @@
+.container {
+    display: flex;
+    flex-direction: column;
+    flex-grow: 1;
+    background-color: var(--main-bg-color);
+    align-items: center;
+    padding-bottom: 20px;
+}
+
+.container > div {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    margin-bottom: auto;
+}

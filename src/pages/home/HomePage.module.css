@@ -1,0 +1,51 @@
+.container {
+    display: flex;
+    flex-direction: column;
+    flex-grow: 1;
+    background-color: var(--main-bg-color);
+    align-items: center;
+    padding-bottom: 20px;
+}
+
+.container > div {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    margin-bottom: auto;
+}
+
+.eodHelpImage {
+    max-width: 300px;
+    margin-top: 15px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.pushButtonContainer {
+    display: flex;
+    flex-grow: 1;
+    flex-direction: column;
+}
+
+.actionsContainer {
+    display: flex;
+    flex-shrink: 1;
+    flex-direction: column;
+    margin-left: auto;
+    margin-right: auto;
+    width: fit-content;
+}
+
+.settingsButton {
+    position: absolute;
+    top: 0px;
+    right: 0px;
+    margin: 25px;
+}
+
+@media screen and (min-height:768px) {
+    .container > div {
+        margin-top: auto;
+        margin-bottom: auto;
+    }
+}
