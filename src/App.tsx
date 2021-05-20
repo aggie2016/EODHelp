@@ -1,17 +1,17 @@
 import React from 'react';
 import { useAtom } from 'jotai';
-import { Route, Redirect, Switch, useHistory } from 'react-router-dom';
+import { Redirect, Route, Switch } from 'react-router-dom';
 import { Button, createMuiTheme } from '@material-ui/core';
 import { ThemeProvider } from 'styled-components';
 import CssBaseline from '@material-ui/core/CssBaseline';
 import { IUserInfo, userInfoAtom } from './utilties/hooks';
-import { ErrorBoundary, ErrorBoundaryProps, FallbackProps } from 'react-error-boundary';
+import { ErrorBoundary, FallbackProps } from 'react-error-boundary';
 import { HomePage } from './pages/home/HomePage';
 import { ContactsPage } from './pages/contacts/ContactsPage';
 import { RegisterPage } from './pages/register/RegisterPage';
+import { Alert, AlertTitle } from '@material-ui/lab';
 
 import './App.css';
-import { Alert, AlertTitle } from '@material-ui/lab';
 
 const theme = createMuiTheme({
     palette: {
@@ -19,15 +19,18 @@ const theme = createMuiTheme({
     },
 });
 
-function App() {
+const App: React.FC = () => {
     const [userInfo] = useAtom<IUserInfo>(userInfoAtom);
 
+    /**
+     *  Returns the routes that are only available when the user has a valid phone
+     *  number associated with their application.
+     */
     const getOptionalRoutes = () => {
-        if (true) {
+        if (userInfo.phoneNumber) {
             return (
                 <>
                     <Route path={'/contacts'} component={ContactsPage} />
-                    <Route path={'/register'} component={RegisterPage} />
                 </>
             );
         }
@@ -39,6 +42,11 @@ function App() {
         );
     };
 
+    /**
+     *  Provides a fallback component that prints the error message caught along
+     *  with a stack trace for diagnostics
+     * @param props the fallback props
+     */
     const ErrorFallback = (props: FallbackProps) => {
         return (
             <Alert
@@ -66,11 +74,12 @@ function App() {
             >
                 <Switch>
                     <Route exact path='/' component={HomePage} />
+                    <Route path={'/register'} component={RegisterPage} />
                     {getOptionalRoutes()}
                 </Switch>
             </ErrorBoundary>
         </ThemeProvider>
     );
-}
+};
 
 export default App;

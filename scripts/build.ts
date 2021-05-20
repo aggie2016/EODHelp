@@ -37,7 +37,9 @@ const build = (options: IBuildOptions) => {
         });
     }
 
-    execSync('pnpx react-scripts build');
+    execSync('pnpx react-scripts build', {
+        stdio: 'inherit',
+    });
 
     copySync('./build', options.outputDirectory);
 

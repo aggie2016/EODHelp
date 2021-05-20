@@ -1,11 +1,21 @@
 import { useState } from 'react';
 import { atom } from 'jotai';
 
+/**
+ * Defines the information required for each user.
+ */
 export interface IUserInfo {
     phoneNumber?: string;
 }
 
+/**
+ * Atom that retrieves the user information saved in local storage if it exists.
+ */
 const initialUserInfoAtom = atom(JSON.parse(localStorage.getItem('userInformation') ?? '{}'));
+
+/**
+ * Atoms that allows the application to save user information in local storage.
+ */
 export const userInfoAtom = atom(
     (get) => get(initialUserInfoAtom),
     (get, set, update: any) => {
@@ -23,6 +33,18 @@ export const userInfoAtom = atom(
     }
 );
 
+/**
+ * React hook that provides a getter and setter for a specific property in
+ * local storage. The usage of this hook is similar to React.useState.
+ *
+ * <code>
+ * <pre>
+ * const [userList, setUserList] = useLocalStorage<string[]>("userList", []);
+ * </pre>
+ * </code>
+ * @param key the property name in local storage to be read/written.
+ * @param initialValue the default value to use if the property does not exist.
+ */
 export const useLocalStorage = <T,>(key: string, initialValue: T) => {
     // State to store our value
     // Pass initial state function to useState so logic is only executed once

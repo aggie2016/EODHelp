@@ -18,23 +18,15 @@ import PhoneInput from 'react-phone-input-2';
 import { Alert, AlertTitle } from '@material-ui/lab';
 
 import 'react-phone-input-2/lib/material.css';
+import { sendGenerateCodeRequest, verifyCodeRequest, VerifyType } from 'db-core';
 
 interface IClientPhoneNumberForm {
     onSave: (phoneNumber: string) => void;
 }
 
-enum VerifyType {
-    Voice,
-    SMS,
-}
-
 interface IFormProps {
     verificationType: VerifyType;
     phoneNumber: string;
-}
-
-interface IVerificationProps {
-    challengeId: number;
 }
 
 const VALIDATION_NUMBER_LENGTH = 6;
@@ -66,54 +58,35 @@ export const ClientPhoneNumberForm: React.FC<IClientPhoneNumberForm> = (props) =
     }, [isValidationDialogOpen]);
 
     const generateCode = (resend?: boolean) => {
-        fetch('/api/auth/generate', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                phoneNumber: formData.phoneNumber,
-                verificationType: formData.verificationType,
-                isPhoneNumberValid: isPhoneNumberValid,
-                resendCode: resend,
-            }),
-        })
-            .then((response) => response.json())
-            .then((tokenData) => {
-                if (tokenData.isSent) {
-                    setChallengeToken(tokenData.challengeId);
+        sendGenerateCodeRequest({
+            resendCode: resend,
+            phoneNumber: formData.phoneNumber,
+            verificationType: formData.verificationType,
+        }).then((result) => {
+            if (result.errorCode || result.errorMessage) {
+                console.error(`Error [${result.errorCode}]: ${result.errorMessage}`);
+            } else {
+                if (result.isSent) {
+                    setChallengeToken(result.challengeId);
                     setIsValidationDialogOpen(true);
-                } else {
-                    // Show error dialog
                 }
-            })
-            .catch((reason) => {
-                console.log(reason);
-                // Show error dialog
-            })
-            .finally(() => {
-                setIsGeneratingCode(false);
-            });
+            }
+
+            setIsGeneratingCode(false);
+        });
     };
 
     const validateCode = async (challengeId: string, code: string): Promise<boolean> => {
-        try {
-            const response = await fetch('/api/auth/verify', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    challengeId: challengeId,
-                    verificationCode: code,
-                }),
-            });
+        const result = await verifyCodeRequest({
+            challengeId: challengeId,
+            verificationCode: code,
+        });
 
-            const validationResult = await response.json();
-            return validationResult && validationResult.isValid;
-        } catch (e) {
-            return false;
+        if (result.errorCode || result.errorMessage) {
+            console.error(`Error [${result.errorCode}]: ${result.errorMessage}`);
         }
+
+        return result.isValid;
     };
 
     const onPhoneSubmitButtonClicked = () => {
@@ -157,23 +130,30 @@ export const ClientPhoneNumberForm: React.FC<IClientPhoneNumberForm> = (props) =
                         <Grid container>
                             <Grid item xs>
                                 <PhoneInput
+                                    autoFormat={false}
                                     country={'us'}
+                                    preferredCountries={['us', 'uk']}
                                     specialLabel={''}
                                     inputStyle={{ width: '100%' }}
+                                    enableSearch={true}
                                     inputProps={{
                                         name: 'phone',
                                         required: true,
                                         autoFocus: true,
                                     }}
-                                    countryCodeEditable={false}
                                     value={formData.phoneNumber}
-                                    onChange={(phone) =>
+                                    onChange={(
+                                        value: string,
+                                        data: any,
+                                        event: React.ChangeEvent<HTMLInputElement>,
+                                        formattedValue: string
+                                    ) =>
                                         setFormData({
                                             ...formData,
-                                            phoneNumber: phone,
+                                            phoneNumber: formattedValue,
                                         })
                                     }
-                                    isValid={(value, country) => {
+                                    isValid={(value: string) => {
                                         const isValidNumber = /\+?([\d|\(][\h|\(\d{3}\)|\.|\-|\d]{4,}\d)/.test(
                                             value
                                         );

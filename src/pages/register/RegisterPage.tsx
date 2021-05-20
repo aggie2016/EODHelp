@@ -1,22 +1,22 @@
 import React from 'react';
 import {
     AppBar,
-    Toolbar,
-    Typography,
-    IconButton,
     Button,
-    Paper,
-    Grid,
+    CircularProgress,
     Dialog,
-    DialogTitle,
+    DialogActions,
     DialogContent,
     DialogContentText,
-    DialogActions,
-    TextField,
-    RadioGroup,
+    DialogTitle,
     FormControlLabel,
+    Grid,
+    IconButton,
+    Paper,
     Radio,
-    CircularProgress,
+    RadioGroup,
+    TextField,
+    Toolbar,
+    Typography,
 } from '@material-ui/core';
 import ArrowBackIcon from '@material-ui/icons/ArrowBack';
 import GetAppIcon from '@material-ui/icons/GetApp';
@@ -36,14 +36,18 @@ import CallIcon from '@material-ui/icons/Call';
 import { useAtom } from 'jotai';
 import { IUserInfo, userInfoAtom } from '../../utilties/hooks';
 import { makeStyles } from '@material-ui/styles';
+import {
+    sendChangeStatusRequest,
+    sendCheckRegistrationRequest,
+    sendGenerateCodeRequest,
+    sendGetAllSettingsRequest,
+    sendRegistrationRequest,
+    verifyCodeRequest,
+    VerifyType,
+} from 'db-core';
 
 interface IApplicationOptions {
     mainPhoneNumber: string;
-}
-
-enum VerifyType {
-    Voice,
-    SMS,
 }
 
 interface IFormProps {
@@ -70,7 +74,7 @@ const styles = makeStyles(() => ({
 const VALIDATION_NUMBER_LENGTH = 6;
 const RESEND_INTERVAL_SECONDS = 15 * 1000;
 
-export const RegisterPage: React.FC = (props) => {
+export const RegisterPage: React.FC = () => {
     const [userInfo, setUserInfo] = useAtom<IUserInfo, IUserInfo>(userInfoAtom);
     const [appSettings, setAppSettings] = React.useState<IApplicationOptions | undefined>(
         undefined
@@ -149,102 +153,63 @@ export const RegisterPage: React.FC = (props) => {
     };
 
     const generateCode = (resend?: boolean) => {
-        fetch('/api/auth/generate', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                phoneNumber: formData.phoneNumber,
-                verificationType: formData.verificationType,
-                isPhoneNumberValid: isPhoneNumberValid,
-                resendCode: resend,
-            }),
-        })
-            .then((response) => response.json())
-            .then((tokenData) => {
-                if (tokenData.isSent) {
-                    setChallengeToken(tokenData.challengeId);
+        sendGenerateCodeRequest({
+            resendCode: resend,
+            phoneNumber: formData.phoneNumber,
+            verificationType: formData.verificationType,
+        }).then((result) => {
+            if (result.errorCode || result.errorMessage) {
+                console.error(`Error [${result.errorCode}]: ${result.errorMessage}`);
+                setRegisterErrorMessage(result.errorMessage);
+            } else {
+                if (result.isSent) {
+                    setChallengeToken(result.challengeId);
                     setIsValidationDialogOpen(true);
-                } else {
-                    // Show error dialog
                 }
-            })
-            .catch((reason) => {
-                console.log(reason);
-                // Show error dialog
-            })
-            .finally(() => {
-                setIsGeneratingCode(false);
-            });
+            }
+
+            setIsGeneratingCode(false);
+        });
     };
 
     const registerUser = () => {
-        fetch('/api/contacts/register', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
+        sendRegistrationRequest({
+            firstName: formData.firstName,
+            lastName: formData.lastName,
+            emailAddress: formData.emailAddress,
+            location: {
+                latitude: location?.coords.latitude ?? 0,
+                longitude: location?.coords.longitude ?? 0,
             },
-            body: JSON.stringify({
-                firstName: formData.firstName,
-                lastName: formData.lastName,
-                emailAddress: formData.emailAddress,
-                location: {
-                    latitude: location?.coords.latitude,
-                    longitude: location?.coords.longitude,
-                },
-                phoneNumber: formData.phoneNumber,
-                additionalInformation: formData.additionalInformation,
-            }),
-        })
-            .then((response) => {
-                if (response.ok) {
-                    return response.json();
-                } else {
-                    response.text().then((errorMessage) => {
-                        setRegisterErrorMessage(errorMessage);
-                    });
-                }
-            })
-            .then((registrationResult) => {
-                if (registrationResult.isRegistered) {
+            phoneNumber: formData.phoneNumber,
+            additionalInformation: formData.additionalInformation,
+        }).then((result) => {
+            if (result.errorCode || result.errorMessage) {
+                console.error(`Error [${result.errorCode}]: ${result.errorMessage}`);
+                setRegisterErrorMessage(result.errorMessage);
+            } else {
+                if (result.isRegistered) {
                     setIsRegistered(true);
                     setUserInfo({
                         ...userInfo,
-                        phoneNumber: registrationResult.phoneNumber,
+                        phoneNumber: result.phoneNumber,
                     });
-                } else {
-                    // Show error dialog
-                    setRegisterErrorMessage(
-                        'An unknown error occurred while registering. Please contact the EOD Help Line for more information.'
-                    );
                 }
-            })
-            .catch((reason) => {
-                console.log(reason);
-                // Show error dialog
-                setRegisterErrorMessage(reason.toString());
-            });
+            }
+        });
     };
 
     const validateCode = async (challengeId: string, code: string): Promise<boolean> => {
-        try {
-            const response = await fetch('/api/auth/verify', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    challengeId: challengeId,
-                    verificationCode: code,
-                }),
-            });
+        const result = await verifyCodeRequest({
+            challengeId: challengeId,
+            verificationCode: code,
+        });
 
-            const validationResult = await response.json();
-            return validationResult && validationResult.isValid;
-        } catch (e) {
-            return false;
+        if (result.errorCode || result.errorMessage) {
+            console.error(`Error [${result.errorCode}]: ${result.errorMessage}`);
         }
+
+        return result.isValid;
     };
 
     const validInputFields = (): boolean => {
@@ -292,27 +257,21 @@ export const RegisterPage: React.FC = (props) => {
 
     const onDisableAccountClicked = () => {
         setIsDisablingAccount(true);
-        fetch('/api/contacts/changeStatus', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                phoneNumber: userInfo.phoneNumber,
-                status: 'disable',
-            }),
+        sendChangeStatusRequest({
+            phoneNumber: userInfo.phoneNumber ?? '',
+            status: 'disable',
         })
-            .then((response) => {
-                if (response.ok) {
-                    return response.json();
-                }
-            })
-            .then((registrationStatus) => {
-                if (registrationStatus.isRegistered !== undefined) {
-                    setIsRegistered(registrationStatus.isRegistered);
-                }
-                if (registrationStatus.isActive !== undefined) {
-                    setIsAccountDisabled(!registrationStatus.isActive);
+            .then((result) => {
+                if (result.errorCode || result.errorMessage) {
+                    console.error(`Error [${result.errorCode}]: ${result.errorMessage}`);
+                    setRegisterErrorMessage(result.errorMessage);
+                } else {
+                    if (result.isRegistered !== undefined) {
+                        setIsRegistered(result.isRegistered);
+                    }
+                    if (result.isActive !== undefined) {
+                        setIsAccountDisabled(!result.isActive);
+                    }
                 }
             })
             .finally(() => {
@@ -322,27 +281,21 @@ export const RegisterPage: React.FC = (props) => {
 
     const onEnableAccountClicked = () => {
         setIsDisablingAccount(true);
-        fetch('/api/contacts/changeStatus', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                phoneNumber: userInfo.phoneNumber,
-                status: 'enable',
-            }),
+        sendChangeStatusRequest({
+            phoneNumber: userInfo.phoneNumber ?? '',
+            status: 'enable',
         })
-            .then((response) => {
-                if (response.ok) {
-                    return response.json();
-                }
-            })
-            .then((registrationStatus) => {
-                if (registrationStatus.isRegistered !== undefined) {
-                    setIsRegistered(registrationStatus.isRegistered);
-                }
-                if (registrationStatus.isActive !== undefined) {
-                    setIsAccountDisabled(!registrationStatus.isActive);
+            .then((result) => {
+                if (result.errorCode || result.errorMessage) {
+                    console.error(`Error [${result.errorCode}]: ${result.errorMessage}`);
+                    setRegisterErrorMessage(result.errorMessage);
+                } else {
+                    if (result.isRegistered !== undefined) {
+                        setIsRegistered(result.isRegistered);
+                    }
+                    if (result.isActive !== undefined) {
+                        setIsAccountDisabled(!result.isActive);
+                    }
                 }
             })
             .finally(() => {
@@ -353,31 +306,26 @@ export const RegisterPage: React.FC = (props) => {
     const removeAccount = () => {
         setIsConfirmRemoveDialogOpen(false);
         setIsRemovingAccount(true);
-        fetch('/api/contacts/changeStatus', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                phoneNumber: userInfo.phoneNumber,
-                status: 'remove',
-            }),
+        sendChangeStatusRequest({
+            phoneNumber: userInfo.phoneNumber ?? '',
+            status: 'remove',
         })
-            .then((response) => {
-                if (response.ok) {
-                    return response.json();
-                }
-            })
-            .then((registrationStatus) => {
-                if (registrationStatus.isRegistered !== undefined) {
-                    setIsRegistered(registrationStatus.isRegistered);
-                }
-                if (registrationStatus.isActive !== undefined) {
-                    setIsAccountDisabled(!registrationStatus.isActive);
+            .then((result) => {
+                if (result.errorCode || result.errorMessage) {
+                    console.error(`Error [${result.errorCode}]: ${result.errorMessage}`);
+                    setRegisterErrorMessage(result.errorMessage);
+                } else {
+                    if (result.isRegistered !== undefined) {
+                        setIsRegistered(result.isRegistered);
+                    }
+                    if (result.isActive !== undefined) {
+                        setIsAccountDisabled(!result.isActive);
+                    }
                 }
             })
             .finally(() => {
                 setIsRemovingAccount(false);
+                setIsPhoneNumberValid(false);
                 setFormData({
                     firstName: '',
                     lastName: '',
@@ -403,36 +351,36 @@ export const RegisterPage: React.FC = (props) => {
 
     React.useEffect(() => {
         // Download all application specific settings
-        fetch('/api/settings/all')
-            .then((response) => response.json())
-            .then((settings) => setAppSettings(settings));
+        sendGetAllSettingsRequest({}).then((result) => {
+            if (result.errorCode || result.errorMessage) {
+                console.error(`Error [${result.errorCode}]: ${result.errorMessage}`);
+                setRegisterErrorMessage(result.errorMessage);
+            } else {
+                setAppSettings({
+                    ...appSettings,
+                    mainPhoneNumber: result.mainPhoneNumber,
+                });
+            }
+        });
 
-        // Check for user registration on load
-        fetch('/api/contacts/checkRegistration', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                phoneNumber: userInfo.phoneNumber,
-            }),
-        })
-            .then((response) => {
-                if (response.ok) {
-                    return response.json();
+        if (userInfo.phoneNumber) {
+            // Check for user registration on load
+            sendCheckRegistrationRequest({
+                phoneNumber: userInfo.phoneNumber ?? '',
+            }).then((result) => {
+                if (result.errorCode || result.errorMessage) {
+                    console.error(`Error [${result.errorCode}]: ${result.errorMessage}`);
+                    setRegisterErrorMessage(result.errorMessage);
+                } else {
+                    if (result.isRegistered) {
+                        setIsRegistered(true);
+                    }
+                    if (result.isActive !== undefined) {
+                        setIsAccountDisabled(!result.isActive);
+                    }
                 }
-            })
-            .then((registrationStatus) => {
-                if (registrationStatus.isRegistered) {
-                    setIsRegistered(true);
-                }
-                if (registrationStatus.isActive !== undefined) {
-                    setIsAccountDisabled(!registrationStatus.isActive);
-                }
-            })
-            .catch((error) => {
-                setIsRegistered(false);
             });
+        }
     }, [userInfo]);
 
     const NavigationBar = () => {
@@ -718,22 +666,30 @@ export const RegisterPage: React.FC = (props) => {
                     <Grid container>
                         <Grid item xs>
                             <PhoneInput
+                                autoFormat={false}
+                                countryCodeEditable={true}
                                 country={'us'}
+                                preferredCountries={['us', 'uk']}
                                 specialLabel={''}
                                 inputStyle={{ width: '100%' }}
+                                enableSearch={true}
                                 inputProps={{
                                     name: 'phone',
                                     required: true,
                                 }}
-                                countryCodeEditable={false}
                                 value={formData.phoneNumber}
-                                onChange={(phone) =>
+                                onChange={(
+                                    value: string,
+                                    data: any,
+                                    event: React.ChangeEvent<HTMLInputElement>,
+                                    formattedValue: string
+                                ) =>
                                     setFormData({
                                         ...formData,
-                                        phoneNumber: phone,
+                                        phoneNumber: formattedValue,
                                     })
                                 }
-                                isValid={(value, country) => {
+                                isValid={(value) => {
                                     const isValidNumber = /\+?([\d|\(][\h|\(\d{3}\)|\.|\-|\d]{4,}\d)/.test(
                                         value
                                     );

@@ -1,11 +1,19 @@
 import React from 'react';
 import { Dialog, DialogContent, DialogContentText, DialogTitle } from '@material-ui/core';
 
+/**
+ * Properties for the {@link LocationAlertDialog}
+ */
 interface ILocationAlertDialog {
     isOpen: boolean;
     onClose?: () => void;
 }
 
+/**
+ * Provides a dialog that displays a message that explains the need for location
+ * services. This dialog can be used prior to requesting location information.
+ * @param props properties for {@link LocationAlertDialog}
+ */
 export const LocationAlertDialog: React.FC<ILocationAlertDialog> = (props) => {
     return (
         <Dialog open={props.isOpen} disableBackdropClick={true} onClose={props.onClose}>

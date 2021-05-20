@@ -38,12 +38,12 @@
 
 .settingsButton {
     position: absolute;
-    top: 0px;
-    right: 0px;
+    top: 0;
+    right: 0;
     margin: 25px;
 }
 
-@media screen and (min-height:768px) {
+@media screen and (min-height: 768px) {
     .container > div {
         margin-top: auto;
         margin-bottom: auto;

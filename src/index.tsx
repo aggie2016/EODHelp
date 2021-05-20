@@ -12,6 +12,11 @@ import reportWebVitals from './reportWebVitals';
 import { Button, Snackbar } from '@material-ui/core';
 import { Alert } from '@material-ui/lab';
 
+/**
+ *  Provides a service worker that caches assets for offline usage.
+ *  When an updated application is available for download, provides the ability
+ *  to force a hard refresh of the SPA.
+ */
 const ServiceWorkerWrapper = () => {
     const [showReload, setShowReload] = React.useState(false);
     const [waitingWorker, setWaitingWorker] = React.useState<ServiceWorker | null>(null);

@@ -1,25 +1,25 @@
 import React from 'react';
 import {
     AppBar,
-    Toolbar,
-    Typography,
-    IconButton,
     Button,
-    Paper,
-    LinearProgress,
-    Grid,
     CircularProgress,
-    TableCell,
-    TableRow,
-    TableHead,
-    Table,
-    TableContainer,
-    TableBody,
     Dialog,
-    DialogTitle,
+    DialogActions,
     DialogContent,
     DialogContentText,
-    DialogActions,
+    DialogTitle,
+    Grid,
+    IconButton,
+    LinearProgress,
+    Paper,
+    Table,
+    TableBody,
+    TableCell,
+    TableContainer,
+    TableHead,
+    TableRow,
+    Toolbar,
+    Typography,
 } from '@material-ui/core';
 import CallIcon from '@material-ui/icons/Call';
 import ArrowBackIcon from '@material-ui/icons/ArrowBack';
@@ -33,6 +33,7 @@ import chromeLogo from '../../images/chrome-logo.svg';
 import firefoxLogo from '../../images/firefox-logo.svg';
 import modernEdgeLogo from '../../images/modern-edge-logo.svg';
 import safariLogo from '../../images/safari-logo.svg';
+import { sendGetAllSettingsRequest, sendNearbyUserRequest } from 'db-core';
 
 interface IApplicationOptions {
     mainPhoneNumber: string;
@@ -44,17 +45,12 @@ interface IContact {
     distanceMinutes: number;
 }
 
-interface IFormField<T> {
-    value: T;
-    isValid?: boolean;
-}
-
 interface ILinkInfo {
     sourceNumber?: string | null;
     targetNumber?: string | null;
 }
 
-export const ContactsPage: React.FC = (props) => {
+export const ContactsPage: React.FC = () => {
     const [userInfo] = useAtom<IUserInfo>(userInfoAtom);
     const [appSettings, setAppSettings] = React.useState<IApplicationOptions | undefined>(
         undefined
@@ -87,42 +83,43 @@ export const ContactsPage: React.FC = (props) => {
     };
 
     React.useEffect(() => {
-        fetch('/api/settings/all')
-            .then((response) => response.json())
-            .then((settings) => setAppSettings(settings));
+        sendGetAllSettingsRequest({}).then((result) => {
+            if (result.errorCode || result.errorMessage) {
+                console.error(`Error [${result.errorCode}]: ${result.errorMessage}`);
+            } else {
+                setAppSettings({
+                    ...appSettings,
+                    mainPhoneNumber: result.mainPhoneNumber,
+                });
+            }
+        });
 
         getLocation();
     }, []);
 
     React.useEffect(() => {
-        if (location) {
-            try {
-                fetch('/api/contacts/listNearby', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        clientId: userInfo.phoneNumber,
-                        location: {
-                            latitude: location.coords.latitude,
-                            longitude: location.coords.longitude,
-                        },
-                    }),
-                })
-                    .then((response) => response.json())
-                    .then((contactData) => {
-                        setContacts(
-                            contactData.map((item: any) => {
-                                return {
-                                    name: item.name.first + ' ' + item.name.last,
-                                    distanceMinutes: item.distanceMinutes.toFixed(0),
-                                    clientId: item.userId,
-                                };
-                            })
-                        );
-                    });
-            } catch (e) {}
+        if (userInfo.phoneNumber && location) {
+            sendNearbyUserRequest({
+                clientId: userInfo.phoneNumber ?? '',
+                location: {
+                    latitude: location.coords.latitude,
+                    longitude: location.coords.longitude,
+                },
+            }).then((result) => {
+                if (result.errorCode || result.errorMessage) {
+                    console.error(`Error [${result.errorCode}]: ${result.errorMessage}`);
+                } else {
+                    setContacts(
+                        result.nearbyUsers.map((item: any) => {
+                            return {
+                                name: item.name.first + ' ' + item.name.last,
+                                distanceMinutes: item.distanceMinutes.toFixed(0),
+                                clientId: item.userId,
+                            };
+                        })
+                    );
+                }
+            });
         }
     }, [location]);
 
